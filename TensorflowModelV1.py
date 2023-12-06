@@ -153,7 +153,7 @@ model = models.Sequential([
     layers.Conv2D(32, (3, 3), activation="relu", input_shape=(144, crop_width, 1)),
     layers.MaxPooling2D((2, 2)),
     layers.Dropout(0.25),
-    layers.Conv2D(8, (3, 3), activation="relu"),
+    layers.Conv2D(4, (3, 3), activation="relu"),
     layers.MaxPooling2D((2, 2)),
     layers.Dropout(0.25),
     layers.Flatten(),
