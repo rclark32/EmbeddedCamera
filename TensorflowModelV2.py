@@ -26,8 +26,11 @@ def load_and_preprocess_data(path):
         if not file.endswith(".jpg"):
             continue
         img.append(cv2.imread(os.path.join(path, file), cv2.IMREAD_GRAYSCALE)[int(x-s/2):int(x+s/2), int(y-s/2):int(y+s/2)])
-        lab.append(file.split("_")[-1].split(".")[0])
-    return np.array(img).astype(np.uint8), np.array(lab)
+        label = file.split("_")[-1].split(".")[0]
+        if label == "partial":
+            label = "full"
+        lab.append(label)
+    return np.array(img), np.array(lab)
 
 
 # function to
@@ -120,20 +123,16 @@ def hex_to_c_array(hex_data, var_name):
     return c_str
 
 
+def representative_data_gen():
+    for input_value in tf.data.Dataset.from_tensor_slices(X_train).batch(1).take(100):
+        # Model has only one input so each data point has one element.
+        yield [input_value]
+
+
 # Write TFLite model to a C source (or header) file
 def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    converter.inference_input_type = tf.int8  # or tf.uint8
-    converter.inference_output_type = tf.int8  # or tf.uint8
-
-    def representative_dataset_generator():
-        for value in X_test:
-            print(np.reshape(value, [1, 40, 40, 1]))
-            yield [np.reshape(value, [1, 40, 40, 1]).astype(np.float32)]
-
-    converter.representative_dataset = representative_dataset_generator
     model_tflite = converter.convert()
     open("model.tflite", "wb").write(model_tflite)
     with open('model' + '.h', 'w') as file:
@@ -142,13 +141,13 @@ def write_model(m):
 
 
 # Set the path to your dataset
-data_path = "./unique_images"
+data_path = "./train_images"
 
 # Load and preprocess data
 images, labels = load_and_preprocess_data(data_path)
 
 # show some of the images as a test
-# display_random(3)
+display_random(3)
 
 # Encode labels
 encoder = LabelEncoder()
@@ -163,10 +162,10 @@ X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, r
 # Build the CNN model
 model = models.Sequential([
     layers.Conv2D(4, (3, 3), activation="relu", input_shape=(len(images[0]), len(images[0][0]), 1)),
-    layers.MaxPooling2D((2, 4)),
+    layers.MaxPooling2D((2, 6)),
     layers.Dropout(0.2),
     layers.Flatten(),
-    layers.Dense(3, activation="softmax")
+    layers.Dense(2, activation="softmax")
 ])
 
 # Compile the model
@@ -179,19 +178,33 @@ model.summary()
 fit = model.fit(X_train, y_train, epochs=40, validation_data=(X_val, y_val))
 
 # show loss history graph
-# display_history(fit)
+display_history(fit)
 
 # show 3 random example images
-# display_predictions(model, X_test, encoder.inverse_transform(np.argmax(y_test, axis=1)), encoder)
+display_predictions(model, X_test, encoder.inverse_transform(np.argmax(y_test, axis=1)), encoder)
 
 # show confusion matrix
-# display_confusion(model.predict(X_test), y_test, encoder)
+display_confusion(model.predict(X_test), y_test, encoder)
 
 
+
+
+
+# q_aware stands for for quantization aware.
+q_aware_model = tfmot.quantization.keras.quantize_model(model)
+
+# `quantize_model` requires a recompile.
+q_aware_model.compile(optimizer='adam', loss="categorical_crossentropy", metrics=['accuracy'])
+
+q_aware_model.summary()
+
+q_aware_model.fit(X_train[0:100], y_train[0:100], batch_size=50, epochs=1, validation_split=0.1)
 
 _, baseline_model_accuracy = model.evaluate(X_test, y_test, verbose=0)
+_, q_aware_model_accuracy = q_aware_model.evaluate(X_test, y_test, verbose=0)
 
 
 # save c header file with tensorflow lite weights
-lite = write_model(model)
+lite = write_model(q_aware_model)
 print('Baseline test accuracy:', baseline_model_accuracy)
+print('Quant test accuracy:', q_aware_model_accuracy)
