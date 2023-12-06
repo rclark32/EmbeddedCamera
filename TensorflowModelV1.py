@@ -14,13 +14,13 @@ import tensorflow as tf
 
 
 # Function to load and preprocess images
-def load_and_preprocess_data(path, crop):
+def load_and_preprocess_data(path):
     img = []
     lab = []
     for file in os.listdir(path):
         if not file.endswith(".jpg"):
             continue
-        img.append(cv2.imread(os.path.join(path, file), cv2.IMREAD_GRAYSCALE)[:, -crop:])
+        img.append(cv2.imread(os.path.join(path, file), cv2.IMREAD_GRAYSCALE)[75:115, -60:-20])
         lab.append(file.split("_")[-1].split(".")[0])
     return np.array(img), np.array(lab)
 
@@ -126,11 +126,9 @@ def write_model(m):
 # Set the path to your dataset
 data_path = "./unique_images"
 
-# Define the width for cropping
-crop_width = 70  # Adjust this value as needed
 
 # Load and preprocess data
-images, labels = load_and_preprocess_data(data_path, crop_width)
+images, labels = load_and_preprocess_data(data_path)
 
 # show some of the images as a test
 display_random(3)
@@ -142,7 +140,7 @@ encoder = LabelEncoder()
 one_hot_labels = to_categorical(encoder.fit_transform(labels))
 
 # reshape the images
-images = images.reshape(-1, 144, crop_width, 1)
+# images = images.reshape(-1, len(images[0]), len(images[0][0]), 1)
 
 # Split the data into train, test, and validation sets
 X_train, X_temp, y_train, y_temp = train_test_split(images, one_hot_labels, test_size=0.4, random_state=598)
@@ -150,12 +148,9 @@ X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, r
 
 # Build the CNN model
 model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation="relu", input_shape=(144, crop_width, 1)),
-    layers.MaxPooling2D((2, 2)),
-    layers.Dropout(0.25),
-    layers.Conv2D(4, (3, 3), activation="relu"),
-    layers.MaxPooling2D((2, 2)),
-    layers.Dropout(0.25),
+    layers.Conv2D(3, (3, 3), activation="relu", input_shape=(len(images[0]), len(images[0][0]), 1)),
+    layers.MaxPooling2D((2, 4)),
+    layers.Dropout(0.2),
     layers.Flatten(),
     layers.Dense(3, activation="softmax")
 ])
