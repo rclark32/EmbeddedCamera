@@ -117,6 +117,7 @@ def hex_to_c_array(hex_data, var_name):
 # Write TFLite model to a C source (or header) file
 def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
     model_tflite = converter.convert()
     open("model.tflite", "wb").write(model_tflite)
     with open('model' + '.h', 'w') as file:
