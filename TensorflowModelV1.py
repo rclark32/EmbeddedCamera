@@ -125,12 +125,11 @@ def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    converter.inference_input_type = tf.int8  # or tf.uint8
-    converter.inference_output_type = tf.int8  # or tf.uint8
+    converter.inference_input_type = tf.uint8  # or tf.uint8
+    converter.inference_output_type = tf.uint8  # or tf.uint8
 
     def representative_dataset_generator():
         for value in X_test:
-            print(np.reshape(value, [1, 40, 40, 1]))
             yield [np.reshape(value, [1, 40, 40, 1]).astype(np.float32)]
 
     converter.representative_dataset = representative_dataset_generator
@@ -139,6 +138,38 @@ def write_model(m):
     with open('model' + '.h', 'w') as file:
         file.write(hex_to_c_array(model_tflite, 'model.h'))
     return model_tflite
+
+
+def test_model():
+    # Instantiate an interpreter for the model
+    tflite_model = tf.lite.Interpreter('model.tflite')
+
+    # Allocate memory for the model
+    tflite_model.allocate_tensors()
+
+    # Get indexes of the input and output tensors
+    tflite_model_input_index = tflite_model.get_input_details()[0]["index"]
+    tflite_model_output_index = tflite_model.get_output_details()[0]["index"]
+
+    # Create arrays to store the results
+    tflite_model_predictions = []
+    correct = 0
+
+    # Run the model's interpreter for each input value (x_value) and store the results in arrays
+    for idx, x_value in enumerate(X_test):
+        # Create a 2D tensor wrapping the current x value
+        x_value_tensor = tf.convert_to_tensor(np.reshape(x_value, [1, 40, 40, 1]))
+        # Write the value to the input tensor
+        tflite_model.set_tensor(tflite_model_input_index, x_value_tensor)
+        # Run inference
+        tflite_model.invoke()
+        # Read the prediction from the output tensor
+        pred = tflite_model.get_tensor(tflite_model_output_index)[0]
+        if np.argmax(pred) == np.argmax(y_test[idx]):
+            correct += 1
+
+    return correct / len(X_test)
+
 
 
 # Set the path to your dataset
@@ -187,11 +218,9 @@ fit = model.fit(X_train, y_train, epochs=40, validation_data=(X_val, y_val))
 # show confusion matrix
 # display_confusion(model.predict(X_test), y_test, encoder)
 
-
-
 _, baseline_model_accuracy = model.evaluate(X_test, y_test, verbose=0)
-
 
 # save c header file with tensorflow lite weights
 lite = write_model(model)
 print('Baseline test accuracy:', baseline_model_accuracy)
+print('Quantized test accuracy:', test_model())
