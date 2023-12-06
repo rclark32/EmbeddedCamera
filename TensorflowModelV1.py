@@ -157,7 +157,6 @@ model = models.Sequential([
     layers.MaxPooling2D((2, 2)),
     layers.Dropout(0.25),
     layers.Flatten(),
-    layers.Dense(16, activation="relu"),
     layers.Dense(3, activation="softmax")
 ])
 
