@@ -118,6 +118,7 @@ def hex_to_c_array(hex_data, var_name):
 def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
     model_tflite = converter.convert()
+    open("model.tflite", "wb").write(model_tflite)
     with open('model' + '.h', 'w') as file:
         file.write(hex_to_c_array(model_tflite, 'model.h'))
 
@@ -149,10 +150,10 @@ X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, r
 
 # Build the CNN model
 model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation="relu", input_shape=(144, crop_width, 1)),
+    layers.Conv2D(16, (3, 3), activation="relu", input_shape=(144, crop_width, 1)),
     layers.MaxPooling2D((2, 2)),
     layers.Dropout(0.25),
-    layers.Conv2D(64, (3, 3), activation="relu"),
+    layers.Conv2D(32, (3, 3), activation="relu"),
     layers.MaxPooling2D((2, 2)),
     layers.Dropout(0.25),
     layers.Flatten(),
