@@ -11,6 +11,8 @@ from sklearn.metrics import confusion_matrix
 from keras import layers, models
 from keras.utils import to_categorical
 import tensorflow as tf
+import keras
+import tensorflow_model_optimization as tfmot
 
 
 # Function to load and preprocess images
@@ -114,19 +116,29 @@ def hex_to_c_array(hex_data, var_name):
     return c_str
 
 
+def representative_data_gen():
+    for input_value in tf.data.Dataset.from_tensor_slices(X_train).batch(1).take(100):
+        # Model has only one input so each data point has one element.
+        yield [input_value]
+
+
 # Write TFLite model to a C source (or header) file
 def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    # converter.representative_dataset = representative_data_gen
+    # converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+    # converter.inference_input_type = tf.uint8  # or tf.uint8
+    # converter.inference_output_type = tf.uint8  # or tf.uint8
     model_tflite = converter.convert()
     open("model.tflite", "wb").write(model_tflite)
     with open('model' + '.h', 'w') as file:
         file.write(hex_to_c_array(model_tflite, 'model.h'))
+    return model_tflite
 
 
 # Set the path to your dataset
 data_path = "./unique_images"
-
 
 # Load and preprocess data
 images, labels = load_and_preprocess_data(data_path)
@@ -159,12 +171,10 @@ model = models.Sequential([
 # Compile the model
 model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
 
+model.summary()
+
 # Train the model
 fit = model.fit(X_train, y_train, epochs=50, validation_data=(X_val, y_val))
-
-# Evaluate the model on the test set
-test_loss, test_acc = model.evaluate(X_test, y_test)
-print(f"Test accuracy: {test_acc}")
 
 # show loss history graph
 display_history(fit)
@@ -175,5 +185,30 @@ display_predictions(model, X_test, encoder.inverse_transform(np.argmax(y_test, a
 # show confusion matrix
 display_confusion(model.predict(X_test), y_test, encoder)
 
+
+
+
+
+# q_aware stands for for quantization aware.
+q_aware_model = tfmot.quantization.keras.quantize_model(model)
+
+# `quantize_model` requires a recompile.
+q_aware_model.compile(optimizer='adam', loss="categorical_crossentropy", metrics=['accuracy'])
+
+q_aware_model.summary()
+
+q_aware_model.fit(X_train[0:100], y_train[0:100],batch_size=50, epochs=1, validation_split=0.1)
+
+
+_, baseline_model_accuracy = model.evaluate(
+    X_test, y_test, verbose=0)
+
+_, q_aware_model_accuracy = q_aware_model.evaluate(
+   X_test, y_test, verbose=0)
+
+print('Baseline test accuracy:', baseline_model_accuracy)
+print('Quant test accuracy:', q_aware_model_accuracy)
+
 # save c header file with tensorflow lite weights
-write_model(model)
+lite = write_model(q_aware_model)
+
