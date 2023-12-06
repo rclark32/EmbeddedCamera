@@ -11,8 +11,6 @@ from sklearn.metrics import confusion_matrix
 from keras import layers, models
 from keras.utils import to_categorical
 import tensorflow as tf
-import keras
-import tensorflow_model_optimization as tfmot
 
 
 # Function to load and preprocess images
@@ -27,7 +25,7 @@ def load_and_preprocess_data(path):
             continue
         img.append(cv2.imread(os.path.join(path, file), cv2.IMREAD_GRAYSCALE)[int(x-s/2):int(x+s/2), int(y-s/2):int(y+s/2)])
         lab.append(file.split("_")[-1].split(".")[0])
-    return np.array(img).astype(np.uint8), np.array(lab)
+    return np.array(img).astype(np.int8), np.array(lab)
 
 
 # function to
@@ -125,8 +123,8 @@ def write_model(m):
     converter = tf.lite.TFLiteConverter.from_keras_model(m)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    converter.inference_input_type = tf.uint8  # or tf.uint8
-    converter.inference_output_type = tf.uint8  # or tf.uint8
+    converter.inference_input_type = tf.int8  # or tf.uint8
+    converter.inference_output_type = tf.int8  # or tf.uint8
 
     def representative_dataset_generator():
         for value in X_test:
@@ -171,7 +169,6 @@ def test_model():
     return correct / len(X_test)
 
 
-
 # Set the path to your dataset
 data_path = "./unique_images"
 
@@ -179,7 +176,7 @@ data_path = "./unique_images"
 images, labels = load_and_preprocess_data(data_path)
 
 # show some of the images as a test
-# display_random(3)
+display_random(3)
 
 # Encode labels
 encoder = LabelEncoder()
