@@ -17,8 +17,8 @@ import tensorflow as tf
 def load_and_preprocess_data(path):
     img = []
     lab = []
-    x = 95
-    y = -40
+    x = 95  # 75, 115
+    y = -40  # -60, -20
     s = 40
     for file in os.listdir(path):
         if not file.endswith(".jpg"):
@@ -28,18 +28,20 @@ def load_and_preprocess_data(path):
     return np.array(img).astype(np.float32), np.array(lab)
 
 
-# function to
+# function to show some of the images and their labels
 def display_predictions(m, img, truth, enc):
     pred_classes = enc.inverse_transform(np.argmax(m.predict(img), axis=1))
     idx = random.sample(range(len(img)), 3)
     display_images(img[idx], truth[idx], pred_classes[idx])
 
 
+# show what the image crop looks like
 def display_random(num):
     idx = random.sample(range(len(images)), num)
     display_images(images[idx], labels[idx])
 
 
+# function that actually plots the image
 def display_images(img, true, pred=None):
     fig, axes = plt.subplots(1, len(img), figsize=(15, 5))
 
@@ -138,6 +140,8 @@ def write_model(m):
     return model_tflite
 
 
+# code here taken from TinyML example documentation
+# used to test the quantization process, unused as quantization did not work
 def test_model():
     # Instantiate an interpreter for the model
     tflite_model = tf.lite.Interpreter('model.tflite')
@@ -190,7 +194,7 @@ X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, r
 
 # Build the CNN model
 model = models.Sequential([
-    layers.Conv2D(4, (3, 3), activation="relu", input_shape=(len(images[0]), len(images[0][0]), 1)),
+    layers.Conv2D(6, (3, 3), activation="relu", input_shape=(len(images[0]), len(images[0][0]), 1)),
     layers.MaxPooling2D((2, 4)),
     layers.Dropout(0.2),
     layers.Flatten(),
@@ -213,7 +217,7 @@ fit = model.fit(X_train, y_train, epochs=40, validation_data=(X_val, y_val))
 # display_predictions(model, X_test, encoder.inverse_transform(np.argmax(y_test, axis=1)), encoder)
 
 # show confusion matrix
-# display_confusion(model.predict(X_test), y_test, encoder)
+display_confusion(model.predict(X_test), y_test, encoder)
 
 _, baseline_model_accuracy = model.evaluate(X_test, y_test, verbose=0)
 
